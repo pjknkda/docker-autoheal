@@ -38,6 +38,8 @@ if [ "$1" = 'autoheal' ] && [ -e ${DOCKER_SOCK} ]; then
   echo "Monitoring containers for unhealthy status in ${AUTOHEAL_START_PERIOD} second(s)"
   sleep ${AUTOHEAL_START_PERIOD}
 
+  AUTOHEAL_ACTION=${AUTOHEAL_ACTION:=restart}
+
   while true; do
     sleep ${AUTOHEAL_INTERVAL:=5}
     
@@ -51,9 +53,19 @@ if [ "$1" = 'autoheal' ] && [ -e ${DOCKER_SOCK} ]; then
         if [ "null" = "$CONTAINER_NAME" ]; then
           echo "$DATE Container name of ($CONTAINER_SHORT_ID) is null, which implies container does not exist - don't restart"
         else
-          echo "$DATE Container ${CONTAINER_NAME} ($CONTAINER_SHORT_ID) found to be unhealthy - Restarting container now with ${TIMEOUT}s timeout"
-          docker_curl -f -XPOST "http://localhost/containers/${CONTAINER_ID}/restart?t=${TIMEOUT}" \
-            || echo "$DATE Restarting container $CONTAINER_SHORT_ID failed"
+          if [ "restart" = "$AUTOHEAL_ACTION" ]; then
+            echo "$DATE Container ${CONTAINER_NAME} ($CONTAINER_SHORT_ID) found to be unhealthy - Restarting container now with ${TIMEOUT}s timeout"
+            docker_curl -f -XPOST "http://localhost/containers/${CONTAINER_ID}/restart?t=${TIMEOUT}" \
+              || echo "$DATE Restarting container $CONTAINER_SHORT_ID failed"
+          elif [ "stop" = "$AUTOHEAL_ACTION" ]; then
+            echo "$DATE Container ${CONTAINER_NAME} ($CONTAINER_SHORT_ID) found to be unhealthy - Stopping container now with ${TIMEOUT}s timeout"
+            docker_curl -f -XPOST "http://localhost/containers/${CONTAINER_ID}/stop?t=${TIMEOUT}" \
+              || echo "$DATE Stopping container $CONTAINER_SHORT_ID failed"
+          elif [ "kill" = "$AUTOHEAL_ACTION" ]; then
+            echo "$DATE Container ${CONTAINER_NAME} ($CONTAINER_SHORT_ID) found to be unhealthy - Killing container now"
+            docker_curl -f -XPOST "http://localhost/containers/${CONTAINER_ID}/kill" \
+              || echo "$DATE Killing container $CONTAINER_SHORT_ID failed"
+          fi
         fi
     done
   done
